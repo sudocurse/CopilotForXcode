@@ -1,16 +1,12 @@
 import CopilotModel
 import Foundation
-
-let suggestionStart = "/*========== Copilot Suggestion"
-let suggestionEnd = "*///======== End of Copilot Suggestion"
-
+let suggestionStart = "\n"
+let suggestionEnd = ""
 // NOTE: Every lines from Xcode Extension has a line break at its end, even the last line.
 // NOTE: Copilot's completion always start at character 0, no matter where the cursor is.
 // NOTE: range.end and postion in Copilot's completion are useless, don't bother looking at them.
-
 public struct SuggestionInjector {
     public init() {}
-
     public struct ExtraInfo {
         public var didChangeContent = false
         public var didChangeCursorPosition = false
@@ -18,7 +14,6 @@ public struct SuggestionInjector {
         public var modifications: [Modification] = []
         public init() {}
     }
-
     public func rejectCurrentSuggestions(
         from content: inout [String],
         cursorPosition: inout CursorPosition,
@@ -26,7 +21,6 @@ public struct SuggestionInjector {
     ) {
         var ranges = [ClosedRange<Int>]()
         var suggestionStartIndex = -1
-
         // find ranges of suggestion comments
         for (index, line) in content.enumerated() {
             if line.hasPrefix(suggestionStart) {
@@ -37,12 +31,9 @@ public struct SuggestionInjector {
                 suggestionStartIndex = -1
             }
         }
-
         let reversedRanges = ranges.reversed()
-
         extraInfo.modifications.append(contentsOf: reversedRanges.map(Modification.deleted))
         extraInfo.didChangeContent = !ranges.isEmpty
-
         // remove the lines from bottom to top
         for range in reversedRanges {
             for i in stride(from: range.upperBound, through: range.lowerBound, by: -1) {
@@ -56,10 +47,9 @@ public struct SuggestionInjector {
                 content.remove(at: i)
             }
         }
-
+        
         extraInfo.suggestionRange = nil
     }
-
     public func proposeSuggestion(
         intoContentWithoutSuggestion content: inout [String],
         completion: CopilotCompletion,
@@ -72,15 +62,9 @@ public struct SuggestionInjector {
         let startText = "\(suggestionStart) \(index + 1)/\(count)"
         var lines = [startText + "\n"]
         lines.append(contentsOf: completion.text.breakLines(appendLineBreakToLastLine: true))
-        lines.append(suggestionEnd + "\n")
-
-        // if suggestion is empty, returns without modifying the code
-        guard lines.count > 2 else { return }
-
         // replace the common prefix of the first line with space and carrot
         let existedLine = start.line < content.endIndex ? content[start.line] : nil
         let commonPrefix = longestCommonPrefix(of: lines[1], and: existedLine ?? "")
-
         if !commonPrefix.isEmpty {
             let replacingText = {
                 switch (commonPrefix.hasSuffix("\n"), commonPrefix.count) {
@@ -92,7 +76,6 @@ public struct SuggestionInjector {
                     return "\n"
                 }
             }()
-
             lines[1].replaceSubrange(
                 lines[1].startIndex..<(
                     lines[1].index(
@@ -104,11 +87,9 @@ public struct SuggestionInjector {
                 with: replacingText
             )
         }
-
         // if the suggestion is only appeding new lines and spaces, return without modification
         if completion.text.dropFirst(commonPrefix.count)
             .allSatisfy({ $0.isWhitespace || $0.isNewline }) { return }
-
         // determin if it's inserted to the current line or the next line
         let lineIndex = start.line + {
             guard let existedLine else { return 0 }
@@ -128,7 +109,6 @@ public struct SuggestionInjector {
             content.insert(contentsOf: lines, at: lineIndex)
         }
     }
-
     public func acceptSuggestion(
         intoContentWithoutSuggestion content: inout [String],
         cursorPosition: inout CursorPosition,
@@ -140,10 +120,8 @@ public struct SuggestionInjector {
         extraInfo.suggestionRange = nil
         let start = completion.range.start
         let suggestionContent = completion.text
-
         let existedLine = start.line < content.endIndex ? content[start.line] : nil
         let commonPrefix = longestCommonPrefix(of: suggestionContent, and: existedLine ?? "")
-
         if let existedLine, existedLine.count > 1, !commonPrefix.isEmpty {
             extraInfo.modifications.append(.deleted(start.line...start.line))
             content.remove(at: start.line)
@@ -153,7 +131,6 @@ public struct SuggestionInjector {
             extraInfo.modifications.append(.deleted(start.line...start.line))
             content.remove(at: start.line)
         }
-
         let toBeInserted = suggestionContent.breakLines(appendLineBreakToLastLine: true)
         if content.endIndex < start.line {
             extraInfo.modifications.append(.inserted(content.endIndex, toBeInserted))
@@ -175,7 +152,6 @@ public struct SuggestionInjector {
         }
     }
 }
-
 extension String {
     /// Break a string into lines.
     func breakLines(appendLineBreakToLastLine: Bool = false) -> [String] {
@@ -190,15 +166,12 @@ extension String {
         }
         return all
     }
-
     var isEmptyOrNewLine: Bool {
         isEmpty || self == "\n"
     }
 }
-
 func longestCommonPrefix(of a: String, and b: String) -> String {
     let length = min(a.count, b.count)
-
     var prefix = ""
     for i in 0..<length {
         let charIndex = a.index(a.startIndex, offsetBy: i)
@@ -206,6 +179,5 @@ func longestCommonPrefix(of a: String, and b: String) -> String {
         guard b[charIndex] == firstStrChar else { return prefix }
         prefix += String(firstStrChar)
     }
-
     return prefix
 }
